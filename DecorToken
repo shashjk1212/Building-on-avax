@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+
+contract DecorToken is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+
+    enum DecorType { OilPaint, POP, Watercolor }
+
+    mapping(DecorType => uint256) public decorRates;
+    DecorType public recentlyRedeemedDecor;
+
+    constructor(address initialOwner) Ownable(initialOwner) ERC20("Decor Token", "DECOR") {
+        setPrices();
+    }
+
+    function setPrices() internal {
+        decorRates[DecorType.OilPaint] = 1000;
+        decorRates[DecorType.POP] = 2000;
+        decorRates[DecorType.Watercolor] = 3000;
+    }
+
+    function setItemPrices(DecorType decorItem, uint256 price) external onlyOwner {
+        decorRates[decorItem] = price;
+    }
+
+    function mintTokens(address beneficiary, uint256 amount) external onlyOwner {
+        _mint(beneficiary, amount);
+    }
+
+    function transferTokens(address recipient, uint256 amount) external {
+        require(balanceOf(msg.sender) >= amount, "INSUFFICIENT TOKENS!!");
+        _transfer(msg.sender, recipient, amount);
+    }
+
+    function burnTokens(uint256 amount) external {
+        require(balanceOf(msg.sender) >= amount, "INSUFFICIENT TOKENS!!");
+        _burn(msg.sender, amount);
+        emit LogMessage("Tokens burned successfully");
+    }
+
+    function redeemForDecor(uint256 tokenAmount) external {
+        recentlyRedeemedDecor = determineRedeemedDecor(tokenAmount);
+        require(decorRates[recentlyRedeemedDecor] > 0, "Invalid decor type");
+        require(balanceOf(msg.sender) >= decorRates[recentlyRedeemedDecor], "INSUFFICIENT TOKENS!!");
+        _burn(msg.sender, decorRates[recentlyRedeemedDecor]);
+        emit LogMessage("Decor item redeemed successfully");
+    }
+
+    function getBalance() external view returns (uint256) {
+        return balanceOf(msg.sender);
+    }
+
+    function determineRedeemedDecor(uint256 tokenAmount) internal view returns (DecorType) {
+        if (decorRates[DecorType.Watercolor] <= tokenAmount) {
+            return DecorType.Watercolor;
+        } else if (decorRates[DecorType.POP] <= tokenAmount) {
+            return DecorType.POP;
+        } else if (decorRates[DecorType.OilPaint] <= tokenAmount) {
+            return DecorType.OilPaint;
+        } else {
+            revert("No decor item can be redeemed with the specified token amount");
+        }
+    }
+
+    function getRecentlyRedeemedDecor() external view returns (DecorType) {
+        return recentlyRedeemedDecor;
+    }
+}
